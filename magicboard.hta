@@ -1,0 +1,169 @@
+﻿<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv='x-ua-compatible' content='ie=9'/>
+        <HTA:APPLICATION
+         APPLICATIONNAME="Magic Board"
+         BORDER="none"
+         CONTEXTMENU="yes"
+         INNERBORDER="no"
+         NAVIGABLE="no"
+         SCROLL="no"
+         SELECTION="no"
+         SHOWINTASKBAR="yes"
+         SINGLEINSTANCE="yes"
+         SYSMENU="no"
+         VERSION="0.0"
+         WINDOWSTATE="maximize"/>
+        <title>Magic Board</title>
+        <style>
+            html, body {
+                padding: 0;
+                margin: 0;
+            }
+            #toolbox {
+                display: none;
+                position: fixed;
+                z-index: 1;
+                
+                background-color: white;
+                border: solid;
+                padding: 1em;
+                border-collapse: separate;
+                box-shadow: 0.5em 0.5em 1em rgba(0, 0, 0, 0.5);
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="canvas"></canvas>
+        <div id="toolbox">toolbox</div>
+        <script>
+            var canvas = document.getElementById("canvas");
+            var ctx = canvas.getContext("2d");
+            var toolbox = document.getElementById("toolbox");
+            
+            canvas.setAttribute('width', window.innerWidth);
+            canvas.setAttribute('height', window.innerHeight);
+            
+            var pages = [], page_num = 0;
+            new_page();
+            
+            var is_mouse_down = false;
+            canvas.addEventListener('mousedown', function(e) {
+                if (e.button == 0) {
+                    is_mouse_down = true;
+                    pages[page_num].events.push({
+                        type: "down",
+                        x: e.pageX,
+                        y: e.pageY
+                    });
+                    draw_event();
+                }
+            });
+            canvas.addEventListener('mousemove', function(e) {
+                if (e.button == 0) {
+                    if (!is_mouse_down) return;
+                    pages[page_num].events.push({
+                        type: "move",
+                        x: e.pageX,
+                        y: e.pageY
+                    });
+                    draw_event();
+                }
+            });
+            canvas.addEventListener('mouseup', function(e) {
+                if (e.button == 0) {
+                    is_mouse_down = false;
+                    pages[page_num].events.push({
+                        type: "up",
+                        x: e.pageX,
+                        y: e.pageY
+                    });
+                    draw_event();
+                }
+                if (e.button == 2) {
+                    toolbox.style.left = e.pageX + "px";
+                    toolbox.style.top = e.pageY + "px";
+                    toolbox.style.display = "block";
+                    toolbox.focus();
+                }
+            });
+            toolbox.addEventListener('blur', function(e) {
+                toolbox.style.display = "none";
+            });
+            
+            function new_page(template) {
+                var events = [
+                    // Line
+                    {type: "set-width", width: ctx.lineWidth},
+                    {type: "set-cap", cap: ctx.lineCap},
+                    {type: "set-join", join: ctx.lineJoin},
+                    {type: "set-miter-limit", limit: ctx.miterLimit},
+                    {type: "set-dash", pattern: ctx.getLineDash(), offset: ctx.lineDashOffset},
+                    
+                    // Text
+                    {type: "set-font", font: ctx.font},
+                    {type: "set-align", align: ctx.textAlign},
+                    {type: "set-baseline", baseline: ctx.textBaseline},
+                    {type: "set-direction", direction: ctx.direction},
+                    
+                    // Fill and stroke
+                    {type: "set-fill", fill: ctx.fillStyle},
+                    {type: "set-stroke", stroke: ctx.strokeStyle},
+                    
+                    // Shadows
+                    {type: "set-shadow-blur", blur: ctx.shadowBlur},
+                    {type: "set-shadow-color", color: ctx.shadowColor},
+                    {type: "set-shadow-offset", x: ctx.shadowOffsetX, y: ctx.shadowOffsetY},
+                    
+                    // Compositing
+                    {type: "set-alpha", alpha: ctx.globalAlpha},
+                    {type: "set-composite", mode: ctx.globalCompositeOperation}
+                ];
+                if (typeof template == "undefined") {
+                    pages.push({
+                        events: events,
+                        background: null,
+                        grid: null
+                    });
+                } else {
+                    pages.push({
+                        events: events,
+                        background: template.background,
+                        grid: template.grid
+                    });
+                }
+            }
+            
+            function redraw_page(page) {
+                if (typeof page == "undefined") {
+                    page = pages[page_num]
+                }
+                var events = page.events;
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);  // Background!
+                // Draw grid too!
+                
+                for (var i = 0; i < events.length; i += 1) {
+                    draw_event(event[i]);
+                }
+            }
+            
+            function draw_event(event) {
+                if (typeof event == "undefined") {
+                    event = pages[page_num].events.slice(-1)[0];
+                }
+                switch (event.type) {
+                    case "move":
+                    case "up":
+                        ctx.lineTo(event.x, event.y);
+                        ctx.stroke();
+                        ctx.beginPath();
+                    case "down":
+                        ctx.moveTo(event.x, event.y);
+                        break;
+                }
+            }
+        </script>
+    </body>
+</html>
