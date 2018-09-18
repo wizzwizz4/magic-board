@@ -49,17 +49,15 @@
             #toolbox .stroke {
                 border-radius: 50%;
             }
-            #toolbox *[disabled] {
+            #toolbox [disabled] {
                 pointer-events: none;
-                
-                /* https://stackoverflow.com/a/18920667 */
-                /*position: absolute;
-                top: 0;
-                bottom: 0;
-                left: 0;
-                right: 0;*/
-                content: "\274c";
-                text-align: center;
+            }
+            #toolbox .first-enabled [disabled] {
+                display: none;
+            }
+            #toolbox .first-enabled :not([disabled]) ~ :not([disabled]) {
+                /* Not the first enabled */
+                display: none;
             }
         </style>
     </head>
@@ -67,10 +65,12 @@
         <canvas id="canvas"></canvas>
         <div id="toolbox">
             <section>
-                <div class=navigation data-action=previous data-disable=disable>←</div>
+                <div class=navigation data-action=previous>←</div>
                 <div class=navigation data-action=refresh>↻</div>
-                <div class=navigation data-action=next data-disable=hide>→</div>
-                <div class=navigation data-action=new data-disable=hide>🆕</div>
+                <span class=first-enabled>
+                    <div class=navigation data-action=next>→</div>
+                    <div class=navigation data-action=new disabled>🆕</div>
+                </span>
             </section>
             <section>
                 <div class=tool data-tool=pencil>✏️</div>
