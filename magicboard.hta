@@ -22,8 +22,10 @@
                 margin: 0;
             }
             #toolbox {
-                display: none;
+                display: block;
                 position: fixed;
+                right: 0;
+                top: 1em;
                 z-index: 1;
                 
                 background-color: white;
@@ -31,12 +33,54 @@
                 padding: 1em;
                 border-collapse: separate;
                 box-shadow: 0.5em 0.5em 1em rgba(0, 0, 0, 0.5);
+                text-align: center;
+            }
+            #toolbox section > * {
+                display: inline-block; /* For horizontal button placement. */
+                cursor: pointer;
+                vertical-align: top;  /* For hypothetical weird spacing issues. */
+                
+                width: 1em;
+                height: 1em;
+            }
+            #toolbox section > *:active {
+                background-color: rgba(0, 0, 0, 0.1);
+            }
+            #toolbox .stroke {
+                border-radius: 50%;
+            }
+            #toolbox *[disabled] {
+                pointer-events: none;
+                
+                /* https://stackoverflow.com/a/18920667 */
+                /*position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                right: 0;*/
+                content: "\274c";
+                text-align: center;
             }
         </style>
     </head>
     <body>
         <canvas id="canvas"></canvas>
-        <div id="toolbox">toolbox</div>
+        <div id="toolbox">
+            <section>
+                <div class=navigation data-action=previous data-disable=disable>←</div>
+                <div class=navigation data-action=refresh>↻</div>
+                <div class=navigation data-action=next data-disable=hide>→</div>
+                <div class=navigation data-action=new data-disable=hide>🆕</div>
+            </section>
+            <section>
+                <div class=tool data-tool=pencil>✏️</div>
+            </section>
+            <section>
+                <div class=stroke data-colour=black></div>
+                <div class=stroke data-colour=red></div>
+                <div class=stroke data-colour=green></div>
+            </section>
+        </div>
         <script>
             var canvas = document.getElementById("canvas");
             var ctx = canvas.getContext("2d");
@@ -50,47 +94,113 @@
             
             var is_mouse_down = false;
             canvas.addEventListener('mousedown', function(e) {
-                if (e.button == 0) {
-                    is_mouse_down = true;
-                    pages[page_num].events.push({
-                        type: "down",
-                        x: e.pageX,
-                        y: e.pageY
-                    });
-                    draw_event();
-                }
+                is_mouse_down = true;
+                pages[page_num].events.push({
+                    type: "down",
+                    x: e.pageX,
+                    y: e.pageY
+                });
+                draw_event();
             });
             canvas.addEventListener('mousemove', function(e) {
-                if (e.button == 0) {
-                    if (!is_mouse_down) return;
-                    pages[page_num].events.push({
-                        type: "move",
-                        x: e.pageX,
-                        y: e.pageY
-                    });
-                    draw_event();
-                }
+                if (!is_mouse_down) return;
+                pages[page_num].events.push({
+                    type: "move",
+                    x: e.pageX,
+                    y: e.pageY
+                });
+                draw_event();
             });
             canvas.addEventListener('mouseup', function(e) {
-                if (e.button == 0) {
-                    is_mouse_down = false;
+                is_mouse_down = false;
+                pages[page_num].events.push({
+                    type: "up",
+                    x: e.pageX,
+                    y: e.pageY
+                });
+                draw_event();
+            });
+            document.addEventListener('keydown', function(e) {
+                // Disable F5
+                if (event.keyCode == 116) {
+                    window.event.returnValue = false;
+                }
+            });
+            (function(){
+                var strokes = document.querySelectorAll('.stroke');
+                for (var i = 0; i < strokes.length; i += 1) {
+                    var stroke = strokes[i];
+                    stroke.style.backgroundColor = stroke.getAttribute('data-colour');
+                    stroke.addEventListener('click', set_stroke);
+                }
+                
+                function set_stroke(e) {
                     pages[page_num].events.push({
-                        type: "up",
-                        x: e.pageX,
-                        y: e.pageY
+                        type: "set-stroke",
+                        stroke: this.getAttribute('data-colour')
                     });
                     draw_event();
                 }
-                if (e.button == 2) {
-                    toolbox.style.left = e.pageX + "px";
-                    toolbox.style.top = e.pageY + "px";
-                    toolbox.style.display = "block";
-                    toolbox.focus();
+            })();
+            (function(){
+                var navs = document.querySelectorAll('.navigation');
+                for (var i = 0; i < navs.length; i += 1) {
+                    var nav = navs[i];
+                    var handler;
+                    switch (nav.getAttribute('data-action')) {
+                        case "previous":
+                            handler = previous;
+                            break;
+                        case "next":
+                            handler = next;
+                            break;
+                        case "refresh":
+                            handler = refresh;
+                            break;
+                        case "new":
+                            handler = new_;
+                            break;
+                    }
+                    nav.addEventListener('click', handler);
                 }
-            });
-            toolbox.addEventListener('blur', function(e) {
-                toolbox.style.display = "none";
-            });
+                update_nav_state();
+                
+                function previous(e) {
+                    if (page_num > 0) page_num -= 1;
+                    redraw_page();
+                    update_nav_state();
+                }
+                function next(e) {
+                    if (page_num < pages.length - 1) page_num += 1;
+                    redraw_page();
+                    update_nav_state();
+                }
+                function refresh(e) {
+                    redraw_page();
+                    update_nav_state();
+                }
+                function new_(e) {
+                    new_page(pages[page_num]);
+                    update_nav_state();
+                }
+                
+                function update_nav_state() {
+                    var can = {
+                        "previous": (page_num > 0),
+                        "next": (page_num < pages.length - 1),
+                        "refresh": true,
+                        "new": true
+                    }
+                    for (var i = 0; i < navs.length; i += 1) {
+                        var nav = navs[i];
+                        if (can[nav.getAttribute('data-action')]) {
+                            nav.removeAttribute("disabled");
+                        } else {
+                            nav.setAttribute("disabled", "");
+                        }
+                    }
+                }
+            })();
             
             function new_page(template) {
                 var events = [
@@ -113,7 +223,7 @@
                     
                     // Shadows
                     {type: "set-shadow-blur", blur: ctx.shadowBlur},
-                    {type: "set-shadow-color", color: ctx.shadowColor},
+                    {type: "set-shadow-colour", colour: ctx.shadowColor},
                     {type: "set-shadow-offset", x: ctx.shadowOffsetX, y: ctx.shadowOffsetY},
                     
                     // Compositing
@@ -145,7 +255,7 @@
                 // Draw grid too!
                 
                 for (var i = 0; i < events.length; i += 1) {
-                    draw_event(event[i]);
+                    draw_event(events[i]);
                 }
             }
             
@@ -158,10 +268,73 @@
                     case "up":
                         ctx.lineTo(event.x, event.y);
                         ctx.stroke();
-                        ctx.beginPath();
                     case "down":
+                        ctx.beginPath();
                         ctx.moveTo(event.x, event.y);
                         break;
+                    
+                    // Line
+                    case "set-width":
+                        ctx.lineWidth = event.width;
+                        break;
+                    case "set-cap":
+                        ctx.lineCap = event.cap;
+                        break;
+                    case "set-join":
+                        ctx.lineJoin = event.join;
+                        break;
+                    case "set-miter-limit":
+                        ctx.miterLimit = event.limit;
+                        break;
+                    case "set-dash":
+                        ctx.setLineDash(event.pattern);
+                        ctx.lineDashOffset = event.offset;
+                        break;
+                    
+                    // Text
+                    case "set-font":
+                        ctx.font = event.font;
+                        break;
+                    case "set-align":
+                        ctx.textAlign = event.align;
+                        break;
+                    case "set-baseline":
+                        ctx.textBaseline = event.baseline;
+                        break;
+                    case "set-direction":
+                        ctx.direction = event.direction;
+                        break;
+                    
+                    // Fill and stroke
+                    case "set-fill":
+                        ctx.fillStyle = event.fill;
+                        break;
+                    case "set-stroke":
+                        ctx.strokeStyle = event.stroke;
+                        break;
+                    
+                    // Shadows
+                    case "set-shadow-blur":
+                        ctx.shadowBlur = event.blur;
+                        break;
+                    case "set-shadow-colour":
+                        ctx.shadowColor = event.colour;
+                        break;
+                    case "set-shadow-offset":
+                        ctx.shadowOffsetX = event.x;
+                        ctx.shadowOffsetY = event.y;
+                        break;
+                    
+                    // Compositing
+                    case "set-alpha":
+                        ctx.globalAlpha = event.alpha;
+                        break;
+                    case "set-composite":
+                        ctx.globalCompositeOperation = event.mode;
+                        break;
+                    default:
+                        alert("This file was made in a never version of the program;\nI don't understand what\n"
+                              + JSON.stringify(event) + "\nmeans.");
                 }
             }
         </script>
